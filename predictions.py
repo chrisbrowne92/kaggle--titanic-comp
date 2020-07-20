@@ -9,6 +9,7 @@ from sklearn.model_selection import GridSearchCV
 from sklearn.model_selection import cross_val_score
 from sklearn.feature_selection import SelectKBest
 from sklearn.feature_selection import chi2
+from sklearn.pipeline import Pipeline
 import seaborn as sns
 from re import match
 
@@ -695,25 +696,266 @@ def title_extractor(name):
 # Still less accurate.
 # Best accuracy: 0.76555   (200 trees, imputing median, all variables)
 # '''
+#
+# ########################################################################################################################
+#
+# '''
+# Step 8: Binning Age
+# Age doesn't necesarily matter. Maybe it matters if you're a child, young adult, middle age, elderly.
+# Note: this means ignoring samples with missing Age values - 20% which is quite a lot.
+# '''
+#
+# # next iteration of data prep function, Age is now categorical
+# def prep_step8(data, test_or_train='train', imputer=None, imputer_strategy='mean', encoder=None):
+#     """
+#     Fourth attempt at data prep function
+#     :param data: DataFrame of data that is to be prepared for input to the model
+#     :param test_or_train: string either 'train' or 'test', indicating if it's training or testing data to be processed
+#     :param imputer: SimpleImputer fit to the training data, will train one if None
+#     :param imputer_strategy: string, goes directly into imputer class: SimpleImputer(strategy=imputer_strategy)
+#     :param encoder: OneHotEncoder fit to the training data, will train one if None
+#     :return: DataFrame of prepared data in the form ready to go into the model
+#     """
+#     # split data into features and labels
+#     if test_or_train == 'train':
+#         features = data.drop('Survived', axis=1)
+#         labels = data['Survived']
+#     elif test_or_train == 'test':
+#         features = data
+#         labels = None
+#     else:
+#         raise Exception(ValueError('value of test_or_train must be \'train\' or \'test\''))
+#     # Sex to numeric
+#     features['is_female'] = features['Sex'].map(dict(male=0, female=1))
+#     # ignore samples with missing values in Embarked
+#     mask = features['Embarked'].notnull()
+#     features = features[mask]
+#     if test_or_train == 'train':
+#         labels = labels[mask]
+#     # encode categorical columns
+#     categorical_columns = ['Embarked', 'Pclass', 'Age']
+#     if encoder is None:
+#         encoder = OneHotEncoder(sparse=False)
+#         encoder.fit(features[categorical_columns])
+#     encoded_cols = encoder.get_feature_names(input_features=categorical_columns)
+#     features[encoded_cols] = pd.DataFrame(encoder.transform(features[categorical_columns]), index=features.index)
+#     features.drop(categorical_columns, axis=1, inplace=True)
+#     # remove unwanted columns
+#     drop_cols = ['Sex', 'Name', 'Ticket', 'Cabin']
+#     features.drop(drop_cols, axis=1, inplace=True)
+#     # impute means
+#     if imputer is None:
+#         if imputer_strategy == 'knn':
+#             # use k-nearest neighbours imputation
+#             imputer = KNNImputer(n_neighbors=5)
+#             imputer.fit(features)
+#         else:
+#             imputer = SimpleImputer(strategy=imputer_strategy)
+#             imputer.fit(features)
+#     features = pd.DataFrame(data=imputer.transform(features), index=features.index, columns=features.columns)
+#     return [features, labels, imputer, encoder]
+# #
+# # # fresh data
+# # train = pd.read_csv('data/train.csv').set_index('PassengerId')
+# # test = pd.read_csv('data/test.csv').set_index('PassengerId')
+# # # group ages into bins - have an 'unknown' bin for missing values. Will imputation add bias?
+# # bins = [-1, 0, 16, 30, 60, 200]
+# # labels = ['unknown', 'child', 'young_adult', 'middle_aged', 'elderly']
+# # fill_val = -1
+# # train['Age'] = train['Age'].fillna(fill_val)
+# # test['Age'] = test['Age'].fillna(fill_val)
+# # test['Age'] = pd.cut(test['Age'], bins=bins, labels=labels)
+# # train['Age'] = pd.cut(train['Age'], bins=bins, labels=labels)
+# # # prepare training and test sets
+# # X_train, y_train, imputer, encoder = prep_step8(train, imputer_strategy='median')
+# # X_test, _, _, _ = prep_step8(test, test_or_train='test', imputer=imputer, encoder=encoder)
+# # # fit model and predict
+# # n_trees = 200
+# # model = RandomForestClassifier(n_estimators=n_trees)
+# # model.fit(X_train, y_train)
+# # y_test = pd.DataFrame(zip(X_test.index, model.predict(X_test)), columns=['PassengerId', 'Survived'])
+# # y_test.to_csv('data/predictions_8_grouped_ages.csv', index=False)
+# #
+# # '''
+# # Test set accuracy: 0.75837
+# # Still less accurate.
+# # Best accuracy: 0.76555   (200 trees, imputing median, all variables)
+# # '''
+# #
+# # '''
+# # Try filling median age instead of having 'unknown' age category
+# # '''
+# # # fresh data
+# train = pd.read_csv('data/train.csv').set_index('PassengerId')
+# test = pd.read_csv('data/test.csv').set_index('PassengerId')
+# # group ages into bins - impute median age before categorising
+# bins = [-1, 0, 16, 30, 60, 200]
+# labels = ['unknown', 'child', 'young_adult', 'middle_aged', 'elderly']
+# fill_val = train['Age'].median()
+# train['Age'] = train['Age'].fillna(fill_val)
+# test['Age'] = test['Age'].fillna(fill_val)
+# test['Age'] = pd.cut(test['Age'], bins=bins, labels=labels)
+# train['Age'] = pd.cut(train['Age'], bins=bins, labels=labels)
+# # prepare training and test sets
+# X_train, y_train, imputer, encoder = prep_step8(train, imputer_strategy='median')
+# X_test, _, _, _ = prep_step8(test, test_or_train='test', imputer=imputer, encoder=encoder)
+# # fit model and predict
+# n_trees = 200
+# model = RandomForestClassifier(n_estimators=n_trees)
+# model.fit(X_train, y_train)
+# y_test = pd.DataFrame(zip(X_test.index, model.predict(X_test)), columns=['PassengerId', 'Survived'])
+# y_test.to_csv('data/predictions_8_grouped_ages_median_filled.csv', index=False)
+# #
+# #
+# # '''
+# # Test set accuracy: 0.76794
+# # Best score yet!
+# # Previous best accuracy: 0.76555   (200 trees, imputing median, all variables)
+# #
+# # One more generated feature to try
+# # '''
+#
+# ########################################################################################################################
+#
+# '''
+# Step 9 - can something be done with SibSp and Parch?
+# We can infer the family size from this as SibSp + Parch + 1 (self).
+# Big families might be helped or hindered in getting off the ship
+# '''
+# # fresh data
+# train = pd.read_csv('data/train.csv').set_index('PassengerId')
+# test = pd.read_csv('data/test.csv').set_index('PassengerId')
+# train['Family_size'] = train['SibSp'] + train['Parch'] + 1
+# test['Family_size'] = test['SibSp'] + test['Parch'] + 1
+# print(train.groupby(['Family_size']).agg(['count', 'mean'])['Survived'])
+# '''
+# Number in group (count), Survival rate (mean)
+#               count     mean
+# Family_size
+# 1              537  0.303538
+# 2              161  0.552795
+# 3              102  0.578431
+# 4               29  0.724138
+# 5               15  0.200000
+# 6               22  0.136364
+# 7               12  0.333333
+# 8                6  0.000000
+# 11               7  0.000000
+#
+# The largest families (8+) had 0% survival rate, it seems that the family size could be impacting survival
+# Seems to be some bands with similar survival rates:
+# Individual: 1
+# Small family: 2-4
+# Medium family: 5-7
+# Large family: 8+
+#
+# Binning these might help predict survival.
+# '''
+# # group family sizes into bins
+# bins = [0, 1, 4, 7, 20]
+# labels = ['individual', 'small_family', 'medium_family', 'large_family']
+# train['Family_size'] = pd.cut(train['Family_size'], bins=bins, labels=labels)
+# test['Family_size'] = pd.cut(test['Family_size'], bins=bins, labels=labels)
+# train.drop(['Parch', 'SibSp'], inplace=True, axis=1)
+# test.drop(['Parch', 'SibSp'], inplace=True, axis=1)
+#
+#
+# # next iteration of data prep function, Family_size now categorical variable
+# def prep_step9(data, test_or_train='train', imputer=None, imputer_strategy='mean', encoder=None):
+#     """
+#     Fourth attempt at data prep function
+#     :param data: DataFrame of data that is to be prepared for input to the model
+#     :param test_or_train: string either 'train' or 'test', indicating if it's training or testing data to be processed
+#     :param imputer: SimpleImputer fit to the training data, will train one if None
+#     :param imputer_strategy: string, goes directly into imputer class: SimpleImputer(strategy=imputer_strategy)
+#     :param encoder: OneHotEncoder fit to the training data, will train one if None
+#     :return: DataFrame of prepared data in the form ready to go into the model
+#     """
+#     # split data into features and labels
+#     if test_or_train == 'train':
+#         features = data.drop('Survived', axis=1)
+#         labels = data['Survived']
+#     elif test_or_train == 'test':
+#         features = data
+#         labels = None
+#     else:
+#         raise Exception(ValueError('value of test_or_train must be \'train\' or \'test\''))
+#     # Sex to numeric
+#     features['is_female'] = features['Sex'].map(dict(male=0, female=1))
+#     # ignore samples with missing values in Embarked
+#     mask = features['Embarked'].notnull()
+#     features = features[mask]
+#     if test_or_train == 'train':
+#         labels = labels[mask]
+#     # encode categorical columns
+#     categorical_columns = ['Embarked', 'Pclass', 'Age', 'Family_size']
+#     if encoder is None:
+#         encoder = OneHotEncoder(sparse=False)
+#         encoder.fit(features[categorical_columns])
+#     encoded_cols = encoder.get_feature_names(input_features=categorical_columns)
+#     features[encoded_cols] = pd.DataFrame(encoder.transform(features[categorical_columns]), index=features.index)
+#     features.drop(categorical_columns, axis=1, inplace=True)
+#     # remove unwanted columns
+#     drop_cols = ['Sex', 'Name', 'Ticket', 'Cabin']
+#     features.drop(drop_cols, axis=1, inplace=True)
+#     # impute means
+#     if imputer is None:
+#         if imputer_strategy == 'knn':
+#             # use k-nearest neighbours imputation
+#             imputer = KNNImputer(n_neighbors=5)
+#             imputer.fit(features)
+#         else:
+#             imputer = SimpleImputer(strategy=imputer_strategy)
+#             imputer.fit(features)
+#     features = pd.DataFrame(data=imputer.transform(features), index=features.index, columns=features.columns)
+#     return [features, labels, imputer, encoder]
+#
+#
+# # group ages into bins - impute median age before categorising
+# bins = [-1, 0, 16, 30, 60, 200]
+# labels = ['unknown', 'child', 'young_adult', 'middle_aged', 'elderly']
+# fill_val = train['Age'].median()
+# train['Age'] = train['Age'].fillna(fill_val)
+# test['Age'] = test['Age'].fillna(fill_val)
+# test['Age'] = pd.cut(test['Age'], bins=bins, labels=labels)
+# train['Age'] = pd.cut(train['Age'], bins=bins, labels=labels)
+# # prepare training and test sets
+# X_train, y_train, imputer, encoder = prep_step9(train, imputer_strategy='median')
+# X_test, _, _, _ = prep_step9(test, test_or_train='test', imputer=imputer, encoder=encoder)
+# # fit model and predict
+# n_trees = 200
+# model = RandomForestClassifier(n_estimators=n_trees)
+# model.fit(X_train, y_train)
+# y_test = pd.DataFrame(zip(X_test.index, model.predict(X_test)), columns=['PassengerId', 'Survived'])
+# y_test.to_csv('data/predictions_9_with_family_size.csv', index=False)
+#
+# '''
+# Test set accuracy: 0.76076
+# Reduced accuracy.
+# Best accuracy: 0.76794   (200 trees, imputing median, categorising age)
+#
+# Maybe more hyperparameter tuning is necessary
+# '''
 
 ########################################################################################################################
 
 '''
-Step 8: Binning Age
-Age doesn't necesarily matter. Maybe it matters if you're a child, young adult, middle age, elderly.
-Note: this means ignoring samples with missing Age values - 20% which is quite a lot.
+Step 10 - more tuning of model hyper-parameters ---> grid search w. cross validation
+Note: Using the sklearn.Pipeline framework from here, so will restructure the data preprocessing
 '''
 
-# next iteration of data prep function, Age is now categorical
-def prep_step8(data, test_or_train='train', imputer=None, imputer_strategy='mean', encoder=None):
+train = pd.read_csv('data/train.csv').set_index('PassengerId')
+test = pd.read_csv('data/test.csv').set_index('PassengerId')
+
+'''
+Feature gereation / selection
+'''
+def prep_step10(data, test_or_train='train'):
     """
-    Fourth attempt at data prep function
+    Prepare data to be sent into Pipeline
     :param data: DataFrame of data that is to be prepared for input to the model
     :param test_or_train: string either 'train' or 'test', indicating if it's training or testing data to be processed
-    :param imputer: SimpleImputer fit to the training data, will train one if None
-    :param imputer_strategy: string, goes directly into imputer class: SimpleImputer(strategy=imputer_strategy)
-    :param encoder: OneHotEncoder fit to the training data, will train one if None
-    :return: DataFrame of prepared data in the form ready to go into the model
+    :return: DataFrame of prepared data in the form ready to go into the Pipeline
     """
     # split data into features and labels
     if test_or_train == 'train':
@@ -725,112 +967,64 @@ def prep_step8(data, test_or_train='train', imputer=None, imputer_strategy='mean
     else:
         raise Exception(ValueError('value of test_or_train must be \'train\' or \'test\''))
     # Sex to numeric
-    features['is_female'] = features['Sex'].map(dict(male=0, female=1))
-    # ignore samples with missing values in Embarked
-    mask = features['Embarked'].notnull()
-    features = features[mask]
-    if test_or_train == 'train':
-        labels = labels[mask]
-    # extract title from name
-    features['Title'] = features['Name'].apply(title_extractor)
-    # create mapping dictionary to be applied to title column
-    title_map = dict(zip(['Dr', 'Rev', 'Major', 'Col', 'Capt'],
-                         ['Professional'] * 5))
-    title_map.update(dict(zip(['Lady', 'Jonkheer', 'Don', 'Dona', 'Countess', 'Sir'],
-                              ['Noble'] * 6)))
-    title_map.update(dict(Mr='Mr', Mrs='Mrs', Miss='Miss', Master='Master', Mlle='Miss', Mme='Mrs', Ms='Mrs'))
-    # categorise special title names (e.g. 'Dr' & 'Lady')
-    features['Title'] = features['Title'].map(title_map)
-    # encode categorical columns
-    categorical_columns = ['Embarked', 'Pclass', 'Title', 'Age']
-    if encoder is None:
-        encoder = OneHotEncoder(sparse=False)
-        encoder.fit(features[categorical_columns])
-    encoded_cols = encoder.get_feature_names(input_features=categorical_columns)
-    features[encoded_cols] = pd.DataFrame(encoder.transform(features[categorical_columns]), index=features.index)
-    features.drop(categorical_columns, axis=1, inplace=True)
+    features['Sex'] = features['Sex'].map(dict(male=0, female=1))
+    # group ages into bins - impute median age before categorising
+    bins = [-1, 0, 16, 30, 60, 200]
+    bin_labels = ['unknown', 'child', 'young_adult', 'middle_aged', 'elderly']
+    fill_val = features['Age'].median()
+    features['Age'] = features['Age'].fillna(fill_val)
+    features['Age'] = pd.cut(features['Age'], bins=bins, labels=bin_labels)
     # remove unwanted columns
-    drop_cols = ['Sex', 'Name', 'Ticket', 'Cabin']
+    drop_cols = ['Name', 'Ticket', 'Cabin']
     features.drop(drop_cols, axis=1, inplace=True)
-    # impute means
-    if imputer is None:
-        if imputer_strategy == 'knn':
-            # use k-nearest neighbours imputation
-            imputer = KNNImputer(n_neighbors=5)
-            imputer.fit(features)
-        else:
-            imputer = SimpleImputer(strategy=imputer_strategy)
-            imputer.fit(features)
-    features = pd.DataFrame(data=imputer.transform(features), index=features.index, columns=features.columns)
-    return [features, labels, imputer, encoder]
+    return [features, labels]
 
-# fresh data
-train = pd.read_csv('data/train.csv').set_index('PassengerId')
-test = pd.read_csv('data/test.csv').set_index('PassengerId')
-# group ages into bins - have an 'unknown' bin for missing values. Will imputation add bias?
-bins = [-1, 0, 16, 30, 60, 200]
-labels = ['unknown', 'child', 'young_adult', 'middle_aged', 'elderly']
-fill_val = -1
-train['Age'] = train['Age'].fillna(fill_val)
-test['Age'] = test['Age'].fillna(fill_val)
-test['Age'] = pd.cut(test['Age'], bins=bins, labels=labels)
-train['Age'] = pd.cut(train['Age'], bins=bins, labels=labels)
+
 # prepare training and test sets
-X_train, y_train, imputer, encoder = prep_step8(train, imputer_strategy='median')
-X_test, _, _, _ = prep_step8(test, test_or_train='test', imputer=imputer, encoder=encoder)
-# fit model and predict
-n_trees = 200
-model = RandomForestClassifier(n_estimators=n_trees)
-model.fit(X_train, y_train)
-y_test = pd.DataFrame(zip(X_test.index, model.predict(X_test)), columns=['PassengerId', 'Survived'])
-y_test.to_csv('data/predictions_8_grouped_ages.csv', index=False)
+X_train, y_train = prep_step10(train)
+X_test, _ = prep_step10(test, test_or_train='test')
 
 '''
-Test set accuracy: 0.75837
-Still less accurate.
-Best accuracy: 0.76555   (200 trees, imputing median, all variables)
+Define Pipeline framework
 '''
-
-'''
-Try filling median age instead of having 'unknown' age category
-'''
-# fresh data
-train = pd.read_csv('data/train.csv').set_index('PassengerId')
-test = pd.read_csv('data/test.csv').set_index('PassengerId')
-# group ages into bins - impute median age before categorising
-bins = [-1, 0, 16, 30, 60, 200]
-labels = ['unknown', 'child', 'young_adult', 'middle_aged', 'elderly']
-fill_val = train['Age'].median()
-train['Age'] = train['Age'].fillna(fill_val)
-test['Age'] = test['Age'].fillna(fill_val)
-test['Age'] = pd.cut(test['Age'], bins=bins, labels=labels)
-train['Age'] = pd.cut(train['Age'], bins=bins, labels=labels)
-# prepare training and test sets
-X_train, y_train, imputer, encoder = prep_step8(train, imputer_strategy='median')
-X_test, _, _, _ = prep_step8(test, test_or_train='test', imputer=imputer, encoder=encoder)
-# fit model and predict
-n_trees = 200
-model = RandomForestClassifier(n_estimators=n_trees)
-model.fit(X_train, y_train)
-y_test = pd.DataFrame(zip(X_test.index, model.predict(X_test)), columns=['PassengerId', 'Survived'])
-y_test.to_csv('data/predictions_8_grouped_ages_median_filled.csv', index=False)
-
+# numerical columns
+numerical_features = ['SibSp', 'Parch', 'Fare']
+categorical_features = ['Pclass', 'Age', 'Embarked', 'Sex']
+# processor for each data type
+numerical_processor = SimpleImputer(strategy='median')
+categorical_processor = Pipeline(steps=[('impute', SimpleImputer(strategy='most_frequent')),
+                                        ('encode', OneHotEncoder())])
+# preprocessor stage of pipeline
+preprocessor = ColumnTransformer(transformers=[('numerical', numerical_processor, numerical_features),
+                                               ('categorical', categorical_processor, categorical_features)])
+# model stage of pipeline
+model = RandomForestClassifier(random_state=0, n_estimators=200)
+# full data pipeline
+full_pipeline = Pipeline(steps=[('preprocessor', preprocessor),
+                                ('model', model)],
+                         verbose=False)
 
 '''
-Test set accuracy: 0.76555
-Matched the best score.
-Best accuracy: 0.76555   (200 trees, imputing median, all variables)
-
-Maybe more hyperparameter tuning is necessary
+Train and make predictions
 '''
-
-########################################################################################################################
-
+# fit to training data
+full_pipeline.fit(X_train, y_train)
+# predict from test data
+y_test = pd.DataFrame(zip(X_test.index, full_pipeline.predict(X_test)), columns=['PassengerId', 'Survived'])
+y_test.to_csv('data/predictions_10_with_Pipeline.csv', index=False)
 
 '''
-Step 8 - more tuning of model hyper-parameters ---> grid search w. cross validation
-Note: Using the sklearn.Pipeline framework from here, so will restructure the data preprocessing
+Grid search with cross-validation to determine best model hyper-parameters
 '''
-
-train = pd.read_csv('data/train.csv').set_index('PassengerId')
-test = pd.read_csv('data/test.csv').set_index('PassengerId')
+param_grid = {
+    'model__n_estimators': [100, 200, 300, 500],
+    'model__criterion': ['gini', 'entropy'],
+    'model__max_depth': [None, 2, 3, 4, 5],
+    'model__min_samples_leaf': [1, 3, 4, 5],
+    'model__min_samples_split': [2, 6, 8, 10, 12],
+}
+grid_search = GridSearchCV(full_pipeline, param_grid=param_grid, n_jobs=-1, verbose=1)
+grid_search.fit(X_train, y_train)
+best_params = pd.Series(grid_search.best_params_)
+best_params.to_csv('best_params.csv')
+print(grid_search.best_params_)
