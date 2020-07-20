@@ -10,3 +10,7 @@ The code which shows my workings from start to finish. It is separated into step
 
 final.py:
 Final processing and prediction, based on what was learnt in predictions.py
+
+data: contains the raw data as well as the predictions made. Predictions are named with the step number (for the step that generated the prediction) and a very short description about what was done differently in that step.
+
+plots: contains a few plots that were generated in the exploration phase.
